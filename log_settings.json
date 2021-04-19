@@ -1,0 +1,36 @@
+{
+    "_comment1": "Log settings for Windows/PyCharm development, this should be replaced in production.",
+    "_comment2": "Your account must have Full Control to the registry key:",
+    "_comment3": "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\EventLog\n\nApplication",
+    "_comment4": "The pywin32 library must be installed: https://github.com/mhammond/pywin32",
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "simple": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+        }
+    },
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "DEBUG",
+            "formatter": "simple",
+            "stream": "ext://sys.stdout"
+        },
+
+        "windows_eventlog": {
+            "class": "logging.handlers.NTEventLogHandler",
+            "level": "INFO",
+            "formatter": "simple",
+            "appname": "AppControlAgentUpgrader",
+            "dllname":"",
+            "logtype": "Application"
+        }
+    },
+
+    "root": {
+        "level": "DEBUG",
+        "handlers": ["console", "windows_eventlog"]
+    }
+}
