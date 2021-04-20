@@ -40,7 +40,7 @@ def main(params):
     logging.getLogger("cbapi").setLevel(logging.WARNING)        # Hide cbapi debug
     logging.getLogger("urllib3").setLevel(logging.WARNING)      # Hide URLLIB debug
 
-    if params.debug:
+    if params.verbose:
         logger.setLevel(logging.DEBUG)
         logging.getLogger("cbapi").setLevel(logging.DEBUG)
     else:
@@ -101,12 +101,13 @@ def main(params):
 
                     for i in range(params.threads):
                         worker = Thread(target=process_queue, args=(
-                            cb, logger, pending_queue, params.check, params.upgrade))
+                            cb, logger, pending_queue, params))
                         worker.start()
 
                     # Wait until all of the items in the queue have been processed
-                    # Note that join can't be interrupted by CTRL-C, you have to kill the process.
-                    pending_queue.join()
+                    # Alternative to pending_queue.join() that allows for CTRL-C
+                    while not pending_queue.empty():
+                        time.sleep(1)
 
     except cbapi.errors.CredentialError as error:
         logger.error("Error with login credentials: " + str(error))
@@ -119,20 +120,26 @@ def main(params):
 # ------------------------------------------------------------------
 #   PROCESS_QUEUE
 # ------------------------------------------------------------------
-def process_queue(cb, logger, pending_queue, check, upgrade):
+def process_queue(cb, logger, pending_queue, params):
     # This queue is called by threads from main.  It will pop a computer object
     # off the queue (in a threadsafe manner) and process it (upgrade and check as needed).
 
     while not pending_queue.empty():
-        computer = pending_queue.get()      # get removes the item from the queue
+        if params.quit_time <= datetime.now():
+            logger.info("Quit time of " + str(params.quit_time) + " reached.")
+            with pending_queue.mutex:
+                pending_queue.queue.clear()     # Clear the rest of the items in the queue
+            break
+        else:
+            computer = pending_queue.get()      # get removes the item from the queue
 
-        logger.debug(computer.name + ' starting thread: ' + current_thread().name)
-        if upgrade:
-            perform_upgrade(logger, computer)
-        if check:
-            perform_check(logger, computer, cb)
+            logger.debug(computer.name + ' starting thread: ' + current_thread().name)
+            if params.upgrade:
+                perform_upgrade(logger, computer)
+            if params.check:
+                perform_check(logger, computer, cb)
 
-        logger.info(computer.name + ' finished.  Queue items remaining: ' + str(pending_queue.qsize()))
+            logger.info(computer.name + ' finished.  Queue items remaining: ' + str(pending_queue.qsize()))
         pending_queue.task_done()           # signals that we're done with this thread
 
     logger.debug("Thread completed/queue empty: " + current_thread().name)
@@ -143,12 +150,13 @@ def process_queue(cb, logger, pending_queue, check, upgrade):
 # ------------------------------------------------------------------
 def perform_upgrade(logger, computer):
 
+
     status = computer.upgradeStatus
 
     logger.debug(computer.name + ' status: ' + status)
     if status == 'Not requested':        # Agent hasn't been asked to upgrade yet, but upgrade is available and ready
         time.sleep(3)
-        # # Ask the agent to upgrade
+        # Ask the agent to upgrade
         logger.info(computer.name + ' requesting upgrade...')
         computer.forceUpgrade = True     # Setting to cause upgrade
         computer.save()                  # Save setting
@@ -170,6 +178,7 @@ def perform_upgrade(logger, computer):
         logger.info(computer.name + " already up to date.")
 
     logger.info(computer.name + ' upgrade process completed with status: ' + status)
+    time.sleep(30)
 
 
 # ------------------------------------------------------------------
@@ -194,10 +203,9 @@ def perform_check(logger, computer, cb):
         event_query = event_query.where("subtypeName:Cache check complete")
         event_query = event_query.sort("timestamp DESC").first()
 
-        latest_event = None
         try:        # Try to parse the event's timestamp into a datetime
             latest_event = datetime.strptime(event_query.timestamp, '%Y-%m-%dT%H:%M:%S%z')
-        except ValueError as error:
+        except ValueError:
             logger.debug(computer.name + ' unexpected latest cache check event is ' + event_query.timestamp)
             latest_event = datetime.min()
             pass
@@ -244,7 +252,7 @@ def initialize_logging():
     except FileNotFoundError:
         print("Log configuration file not found: " + traceback.format_exc())
         logging.basicConfig(level=logging.DEBUG)        # fallback to basic settings
-    except json.decoder.JSONDecodeError as e:
+    except json.decoder.JSONDecodeError:
         print("Error parsing logger config file: " + traceback.format_exc())
         raise
 
@@ -280,8 +288,11 @@ if __name__ == '__main__':  # This code is executed when the script is run from 
                         help='Perform the upgrade on the selected systems.')
     parser.add_argument("-c", "--check", action="store_true", default=False,
                         help='Perform the consistency check on the selected systems.')
-    parser.add_argument("-d", "--debug", action="store_true", default=False,
-                        help='Include debug output.')
+    parser.add_argument("-v", "--verbose", action="store_true", default=False,
+                        help='Include verbose output.')
+    parser.add_argument("-q", "--quit-time", action="store", type=datetime.fromisoformat,
+                        help='Set ISO datetime when script should stop performing new upgrades/checks.'
+                             + '\nexample: -q "2021-04-20 06:09:00"')
 
     # Set the default argument
     args = parser.parse_args()
