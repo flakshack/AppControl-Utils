@@ -28,6 +28,13 @@ The "cbapi-protection" script is installed when cbapi is installed by pip.  Runn
 This interactive process also sets the HTTPS address of the APPControl server.
 
 
+## Log Settings
+The script pulls the settings for logger from log_settings.json at runtime.  It is currently configured to output
+to both the STDOUT and Windows Application Event Log.  Follow the directions in log_settings.json to set the registry key 
+permissions required for EventLog access.  Alternately, you can edit the file to remove the windows_eventlog handler,
+in which case pywin32 is no longer a requirement.
+
+
 ## agent-upgrader
 This script will perform a staged upgrade of AppControl (Bit9) agents along with the required CC3 check (if you've disabled that check from happening automatically), see below.
 
