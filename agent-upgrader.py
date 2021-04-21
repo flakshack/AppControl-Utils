@@ -61,11 +61,13 @@ def main(params):
             query = cb.select(Computer).where("deleted:false")
 
             # Filter by Computer
-            computer_filter = []
-            for name in params.computer_names:
-                computer_filter.append(r"name:" + str(name))
-            if computer_filter:
-                query = query.where(" or ".join(computer_filter))
+            # computer_filter = []
+            if len(params.computer_names) > 0:
+                query = query.where(r"name:" + '|'.join(params.computer_names))
+
+            # computer_filter.append(r"name:" + str(name))
+            # if computer_filter:
+
             # Filter by Policy
             if params.policy_id != 0:
                 query = query.where('policyId:' + str(params.policy_id))
@@ -84,7 +86,7 @@ def main(params):
             # ---- Process the items------------------
             if found_items > 0:
                 if not (params.check or params.upgrade):  # Upgrade or Check not specified in parameters
-                    print("\nParameters --check and/or --upgrade not specified. " +
+                    print("\nParameters -c, --check and/or -u, --upgrade not specified. " +
                           "List of computers in query shown below:\n")
                     for result in query:
                         print(result.name)
@@ -99,15 +101,27 @@ def main(params):
                     # ---- Create Threads----------------------
                     # Create one thread for each -t setting (default 1)
 
+                    workers = []
                     for i in range(params.threads):
                         worker = Thread(target=process_queue, args=(
                             cb, logger, pending_queue, params))
+                        worker.daemon = True
                         worker.start()
+                        workers.append(worker)
 
                     # Wait until all of the items in the queue have been processed
-                    # Alternative to pending_queue.join() that allows for CTRL-C
-                    while not pending_queue.empty():
-                        time.sleep(1)
+                    # This is a messy alternative to pending_queue.join() that allows for CTRL-C
+                    try:
+                        while True:
+                            all_done = True
+                            for worker in workers:
+                                if worker.is_alive():
+                                    all_done = False
+                            if all_done:
+                                break
+                            time.sleep(1)
+                    except KeyboardInterrupt:
+                        logger.info("CTRL-C received")
 
     except cbapi.errors.CredentialError as error:
         logger.error("Error with login credentials: " + str(error))
@@ -125,7 +139,7 @@ def process_queue(cb, logger, pending_queue, params):
     # off the queue (in a threadsafe manner) and process it (upgrade and check as needed).
 
     while not pending_queue.empty():
-        if params.quit_time <= datetime.now():
+        if params.quit_time and params.quit_time <= datetime.now():
             logger.info("Quit time of " + str(params.quit_time) + " reached.")
             with pending_queue.mutex:
                 pending_queue.queue.clear()     # Clear the rest of the items in the queue
@@ -149,7 +163,6 @@ def process_queue(cb, logger, pending_queue, params):
 #   UPGRADE_AGENT
 # ------------------------------------------------------------------
 def perform_upgrade(logger, computer):
-
 
     status = computer.upgradeStatus
 
@@ -203,12 +216,9 @@ def perform_check(logger, computer, cb):
         event_query = event_query.where("subtypeName:Cache check complete")
         event_query = event_query.sort("timestamp DESC").first()
 
-        try:        # Try to parse the event's timestamp into a datetime
+        latest_event = datetime(2020, 1, 1, 0, 0, 0, 0, tzinfo=timezone.utc)
+        if event_query is not None:  # Try to parse the event's timestamp into a datetime
             latest_event = datetime.strptime(event_query.timestamp, '%Y-%m-%dT%H:%M:%S%z')
-        except ValueError:
-            logger.debug(computer.name + ' unexpected latest cache check event is ' + event_query.timestamp)
-            latest_event = datetime.min()
-            pass
 
         if latest_event > start:    # Compare with our start datetime
             logger.info(computer.name + ' cache check complete.')
@@ -276,8 +286,8 @@ if __name__ == '__main__':  # This code is executed when the script is run from 
     parser.add_argument("-p", "--policy-id", action="store", default=0, type=int,
                         help='Only process computers in this policy id (optional)')
     parser.add_argument("-n", "--computer-names", action="store", type=str, default=[], nargs='*',
-                        help='Space separated list of computers to process ' +
-                             r'(ex:  "DOMAIN\COMPUTER1 DOMAIN\COMPUTER2 *SERVER*")')
+                        help='Space separated list of computers to process. ' +
+                             r'Example: -n DOMAIN\COMPUTER1 DOMAIN\COMPUTER2 *SERVER*')
     parser.add_argument("-t", "--threads", action="store", default=1, type=int,
                         help='The maximum number of simultaneous threads (agent upgrades/checks) at once.')
     parser.add_argument("-a", "--agent-version", action="store", default='', type=str,
@@ -291,8 +301,9 @@ if __name__ == '__main__':  # This code is executed when the script is run from 
     parser.add_argument("-v", "--verbose", action="store_true", default=False,
                         help='Include verbose output.')
     parser.add_argument("-q", "--quit-time", action="store", type=datetime.fromisoformat,
-                        help='Set ISO datetime when script should stop performing new upgrades/checks.'
-                             + '\nexample: -q "2021-04-20 06:09:00"')
+                        help='Set ISO datetime when script should stop performing new upgrades/checks. '
+                             + 'Currently running upgrades/checks will finish as expected. '
+                             + 'Example: -q "2021-04-20 06:09:00"')
 
     # Set the default argument
     args = parser.parse_args()
