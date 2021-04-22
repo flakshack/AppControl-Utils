@@ -72,8 +72,8 @@ def main(params):
             # Filter by Agent Version
             if params.agent_version:
                 query = query.where('agentVersion!' + params.agent_version)
-            # Filter by Online/Connected Systems
-            if params.online:
+            # Filter by Online/Connected Systems (exclude offline by default)
+            if not params.offline:
                 query = query.where('connected:True')
 
             # ---- Run the Query----------------------
@@ -293,8 +293,8 @@ if __name__ == '__main__':  # This code is executed when the script is run from 
                         help='The maximum number of simultaneous threads (agent upgrades/checks) at once.')
     parser.add_argument("-a", "--agent-version", action="store", default='', type=str,
                         help='Filter the list of computers to exclude agents at this version (ex:  -a 8.5.*)')
-    parser.add_argument("-o", "--online", action="store_true", default=False,
-                        help='Include only online computers (currently connected to the server).')
+    parser.add_argument("-o", "--offline", action="store_true", default=False,
+                        help='Include offline computers (not currently connected to the server).')
     parser.add_argument("-u", "--upgrade", action="store_true", default=False,
                         help='Perform the upgrade on the selected systems.')
     parser.add_argument("-c", "--check", action="store_true", default=False,
