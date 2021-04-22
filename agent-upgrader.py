@@ -61,13 +61,11 @@ def main(params):
             query = cb.select(Computer).where("deleted:false")
 
             # Filter by Computer
-            # computer_filter = []
             if len(params.computer_names) > 0:
                 query = query.where(r"name:" + '|'.join(params.computer_names))
-
-            # computer_filter.append(r"name:" + str(name))
-            # if computer_filter:
-
+            # Filter by Excluding Computers
+            if len(params.exclude_computer_names) > 0:
+                query = query.where(r"name!" + '|'.join(params.exclude_computer_names))
             # Filter by Policy
             if params.policy_id != 0:
                 query = query.where('policyId:' + str(params.policy_id))
@@ -288,6 +286,9 @@ if __name__ == '__main__':  # This code is executed when the script is run from 
     parser.add_argument("-n", "--computer-names", action="store", type=str, default=[], nargs='*',
                         help='Space separated list of computers to process. ' +
                              r'Example: -n DOMAIN\COMPUTER1 DOMAIN\COMPUTER2 *SERVER*')
+    parser.add_argument("-e", "--exclude-computer-names", action="store", type=str, default=[], nargs='*',
+                        help='Space separated list of computers to exclude. ' +
+                             r'Example: -e DOMAIN\COMPUTER1 DOMAIN\COMPUTER2 *SERVER*')
     parser.add_argument("-t", "--threads", action="store", default=1, type=int,
                         help='The maximum number of simultaneous threads (agent upgrades/checks) at once.')
     parser.add_argument("-a", "--agent-version", action="store", default='', type=str,

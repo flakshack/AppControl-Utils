@@ -9,18 +9,18 @@ how they will function in your environment.  Please review the LICENSE.txt file.
 ## Installing 
 After installing Python3, Create a virtual environment.
 ```
-python3 -m venv c:\somepath
-cd c:\somepath\scripts
-c:\somepath\scripts\activate.bat
-pip install pywin32
-pip install cbapi
+copy files to c:\somepath
+cd c:\somepath     
+python3 -m venv venv
+.\venv\scripts\activate.bat
+.\venv\scripts\pip install pywin32
+.\venv\scripts\pip install cbapi
 ```
 
 ## API Authentication
 VMware Carbon Black AppControl (Bit9) uses a per-user API token for authentication.  This token is available via the web UI, on the Edit Login page at the bottom in the API section.  Once you have the API Token, you have to create a credential file using the commands:
 ```
-cd c:\somepath\scripts
-python cbapi-protection configure
+.\venv\scripts\python cbapi-protection configure
 ```
 
 The "cbapi-protection" script is installed when cbapi is installed by pip.  Running the command creates a credential token in c:\users\<username>\.carbonblack\credentials.protection.  This token is used automatically by calls to the cbapi.
@@ -57,6 +57,8 @@ optional arguments:
   -n [COMPUTER_NAMES [COMPUTER_NAMES ...]], --computer-names [COMPUTER_NAMES [COMPUTER_NAMES ...]]
                         Space separated list of computers to process (ex:
                         "DOMAIN\COMPUTER1 DOMAIN\COMPUTER2 *SERVER*")
+  -e [EXCLUDE_COMPUTER_NAMES [EXCLUDE_COMPUTER_NAMES ...]], --exclude-computer-names [EXCLUDE_COMPUTER_NAMES [EXCLUDE_COMPUTER_NAMES ...]]
+                        Space separated list of computers to exclude. Example: -e DOMAIN\COMPUTER1 DOMAIN\COMPUTER2 *SERVER*                        
   -t THREADS, --threads THREADS
                         The maximum number of simultaneous threads (agent
                         upgrades/checks) at once.
@@ -74,6 +76,57 @@ optional arguments:
 
 
 ```
+
+### Examples
+
+Use -l to list the available policies
+```
+.\venv\scripts\python.exe agent-upgrader.py -l
+
+---------------Policies-----------------
+
+1 Default Policy
+2 Template Policy
+4 Local Approval Policy
+5 Disabled
+6 Workstations - High Enforcement
+```
+
+Run the script with the -p <id> or -n <somename> parameters to see what computers will be affected.
+
+```
+.\venv\scripts\python.exe agent-upgrader.py -p 6
+
+2021-04-21 18:01:35,031 - appcontrol-agent-upgrader.py - INFO - Searching for computers with query: ['deleted:false', 'policyId:6']
+2021-04-21 18:01:35,127 - appcontrol-agent-upgrader.py - INFO - Items returned: 3
+
+Parameters -c, --check and/or -u, --upgrade not specified. List of computers in query shown below:
+
+MYDOMAIN\WIN10-TEST1
+MYDOMAIN\WIN10-TEST2
+MYDOMAIN\WIN10-TEST3
+```
+
+```
+.\venv\scripts\python.exe agent-upgrader.py -n *TEST1* *TEST2*
+2021-04-21 18:03:09,016 - appcontrol-agent-upgrader.py - INFO - Searching for computers with query: ['deleted:false', 'name:*TEST1*|*TEST2*']
+2021-04-21 18:03:09,149 - appcontrol-agent-upgrader.py - INFO - Items returned: 2
+
+Parameters -c, --check and/or -u, --upgrade not specified. List of computers in query shown below:
+
+MYDOMAIN\WIN10-TEST1
+MYDOMAIN\WIN10-TEST2
+```
+
+Finally, run the upgrade and(or) check process on the selected computers.  In the example below
+we exclude systems that have already been upgraded to 8.5.x and tell the script to stop upgrading (but finish already
+running commands) at 10 PM.  It also will process 8 threads simultaneously.
+
+```
+.\venv\scripts\python.exe agent-upgrader.py -n *WIN10* -u -c -a 8.5.* -q "2021-04-21 22:00:00" -t 8
+```
+
+
 
 # Cache Consistency Checks
 
