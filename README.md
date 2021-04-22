@@ -11,7 +11,7 @@ After installing Python3, Create a virtual environment.
 ```
 copy files to c:\somepath
 cd c:\somepath     
-python3 -m venv venv
+python -m venv venv
 .\venv\scripts\activate.bat
 .\venv\scripts\pip install pywin32
 .\venv\scripts\pip install cbapi
@@ -20,7 +20,7 @@ python3 -m venv venv
 ## API Authentication
 VMware Carbon Black AppControl (Bit9) uses a per-user API token for authentication.  This token is available via the web UI, on the Edit Login page at the bottom in the API section.  Once you have the API Token, you have to create a credential file using the commands:
 ```
-.\venv\scripts\python cbapi-protection configure
+.\venv\scripts\python .\venv\scripts\python\cbapi-protection configure
 ```
 
 The "cbapi-protection" script is installed when cbapi is installed by pip.  Running the command creates a credential token in c:\users\<username>\.carbonblack\credentials.protection.  This token is used automatically by calls to the cbapi.
