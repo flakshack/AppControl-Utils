@@ -145,11 +145,16 @@ def process_queue(cb, logger, pending_queue, params):
         else:
             computer = pending_queue.get()      # get removes the item from the queue
 
+            status = ""
             logger.debug(computer.name + ' starting thread: ' + current_thread().name)
             if params.upgrade:
-                perform_upgrade(logger, computer)
+                status = perform_upgrade(logger, computer)
+
             if params.check:
-                perform_check(logger, computer, cb)
+                if status == "ERROR":
+                    logger.info("Skipping consistency check due to upgrade status: " + status)
+                else:
+                    perform_check(logger, computer, cb)
 
             logger.info(computer.name + ' finished.  Queue items remaining: ' + str(pending_queue.qsize()))
         pending_queue.task_done()           # signals that we're done with this thread
@@ -178,6 +183,7 @@ def perform_upgrade(logger, computer):
             if upgrade_error_count > 0:
                 upgrade_error = computer.upgradeError
                 logger.error(computer.name + ' reported an upgrade error: ' + upgrade_error)
+                status = "ERROR"
                 break
             else:
                 logger.info(computer.name + ' (waiting 10 seconds) current status: ' + status)
@@ -189,7 +195,7 @@ def perform_upgrade(logger, computer):
         logger.info(computer.name + " already up to date.")
 
     logger.info(computer.name + ' upgrade process completed with status: ' + status)
-    time.sleep(30)
+    return status
 
 
 # ------------------------------------------------------------------
